@@ -1,0 +1,104 @@
+#!/usr/bin/perl -w                                                                                                                                               
+
+use XML::Writer;
+use IO::File;
+use File::Copy;
+use XML::RSS;
+
+
+#	get date
+use POSIX qw(strftime);
+$now = strftime "%b_%d_%Y", localtime;
+
+# let's rock'n roll
+my $duration = $ARGV[0];
+my $tmp = "/tmp/";
+#my $datestamp = `date +%s`;
+my $fifo = $tmp."fifo_".$now."\.mp3";
+print $fifo;
+`mkfifo $fifo`;	
+
+	
+# run mplayer and ffmpeg in the background
+system("ffmpeg -i $fifo -acodec aac -b 1200 /tmp/eclectic_$now.m4a &");
+my $pid = fork();
+if (not defined $pid) {
+    warn "resources not avilable.\n";
+} elsif ($pid == 0) {
+    exec("mplayer -quiet -playlist http://media.kcrw.com/live/kcrwlive.pls -ao pcm:file=$fifo -vc dummy -vo null -ac ffmp3");
+    exit(0);
+    print "right after exec gets called\n";
+}
+
+# wait the specified time and then kill mplayer
+sleep($duration * 60);
+kill 2, $pid;
+waitpid($pid,0);
+
+# get the length of the file
+my $length = `mplayer -vo null -ao null -frames 0 -identify /tmp/eclectic_$now.m4a  2>/dev/null | grep -v "=0" | grep "^ID_LENGTH" | uniq | cut -d"=" -f2`;
+chomp($length);
+$length = $length / 60;
+$length = sprintf("%d", $length);
+
+my $output = new IO::File(">/tmp/output.xml");
+my $writer = new XML::Writer(OUTPUT => $output, NEWLINES => 1);
+$writer->xmlDecl("UTF-8");
+$writer->startTag("chapters", "version" => "1");
+$i = 0;
+while ($i < ($length+1)){
+	$writer->startTag("chapter", "starttime" => $i.":00");
+	$writer->startTag("title");
+	my $chapter = $i+1;
+	$writer->characters("Chapter ".$chapter);
+	$writer->endTag("title");
+	$writer->endTag("chapter");
+	$i++;
+	}
+$writer->endTag("chapters");
+$writer->end();
+$output->close();
+
+
+# add chapters
+print "adding chapters...\n";
+`ChapterTool -x /tmp/output.xml -a /tmp/eclectic_$now.m4a -o /tmp/eclectic_$now.m4b`;
+
+#rm -rf $FIFO
+#rm /tmp/eclectic_$NOW.m4a
+
+## add tags
+print "adding tags...\n";
+`AtomicParsley /tmp/eclectic_$now.m4b --overWrite --artist "Morning Becomes Eclectic" --title "MBE- $now" --album "Morning Becomes Eclectic" --artwork /Users/tony/Sites/nic_harcourt.jpg`;
+
+# move to web site
+print "moving to website directory...\n";
+move("/tmp/eclectic_$now.m4b","/Users/tony/Sites/") or die "ERROR: $!\n";
+
+
+## keep the file to a max of $ITEMS entries,
+# insert an item into an RSS file and removes the oldest ones if                                
+## there are already 5 items or more                                                            
+
+my $rss = new XML::RSS;
+$rss->parsefile("/Users/tony/Sites/ripper.xml");
+my $capture = "/Users/tony/Sites/eclectic_$now.m4b";
+my $popper = pop(@{$rss->{'items'}}) if (@{$rss->{'items'}} == 5);
+if($popper){`rm $popper->{'guid'}`;}
+my $date = `date "+%a, %d %h %Y %H:%M:%S %Z"`;
+if ( -e $capture) { } else {die "$capture can't be found\n"};
+$rss->add_item(
+	title => "Morning Becomes Eclectic - $date",
+	link  => "http://legacy.kcrw.com/pl/NowPlayDayNew.html",
+	pubDate => $date,
+	guid => "$capture",
+	enclosure => { url=>"http://localhost/~tony/eclectic_$now.m4b",
+	length => (stat($capture))[7],
+	type => 'audio/x-m4b'
+	},
+	mode  => 'insert'
+	);
+$rss->save("/Users/tony/Sites/ripper.xml");
+
+# cleanup after yourself
+unlink "/tmp/eclectic_$now.m4a", "$fifo", "/tmp/output.xml" or die "couldn't delete: $!\n";
