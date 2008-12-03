@@ -1,0 +1,1 @@
+Ripper is a Perl script which captures an internet radio stream and puts it into a podcast, which is hosted on the local computer. It requires mplayer, ffmpeg, and Apple's ChapterTool, although the latter is not necessary.
