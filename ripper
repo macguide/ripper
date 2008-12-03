@@ -69,11 +69,11 @@ print "adding chapters...\n";
 
 ## add tags
 print "adding tags...\n";
-`AtomicParsley /tmp/eclectic_$now.m4b --overWrite --artist "Morning Becomes Eclectic" --title "MBE- $now" --album "Morning Becomes Eclectic" --artwork /Users/tony/Sites/nic_harcourt.jpg`;
+`AtomicParsley /tmp/eclectic_$now.m4b --overWrite --artist "Morning Becomes Eclectic" --title "MBE- $now" --album "Morning Becomes Eclectic" --artwork /Users/username/Sites/nic_harcourt.jpg`;
 
 # move to web site
 print "moving to website directory...\n";
-move("/tmp/eclectic_$now.m4b","/Users/tony/Sites/") or die "ERROR: $!\n";
+move("/tmp/eclectic_$now.m4b","/Users/username/Sites/") or die "ERROR: $!\n";
 
 
 ## keep the file to a max of $ITEMS entries,
@@ -81,8 +81,8 @@ move("/tmp/eclectic_$now.m4b","/Users/tony/Sites/") or die "ERROR: $!\n";
 ## there are already 5 items or more                                                            
 
 my $rss = new XML::RSS;
-$rss->parsefile("/Users/tony/Sites/ripper.xml");
-my $capture = "/Users/tony/Sites/eclectic_$now.m4b";
+$rss->parsefile("/Users/username/Sites/ripper.xml");
+my $capture = "/Users/username/Sites/eclectic_$now.m4b";
 my $popper = pop(@{$rss->{'items'}}) if (@{$rss->{'items'}} == 5);
 if($popper){`rm $popper->{'guid'}`;}
 my $date = `date "+%a, %d %h %Y %H:%M:%S %Z"`;
@@ -92,13 +92,13 @@ $rss->add_item(
 	link  => "http://legacy.kcrw.com/pl/NowPlayDayNew.html",
 	pubDate => $date,
 	guid => "$capture",
-	enclosure => { url=>"http://localhost/~tony/eclectic_$now.m4b",
+	enclosure => { url=>"http://localhost/~username/eclectic_$now.m4b",
 	length => (stat($capture))[7],
 	type => 'audio/x-m4b'
 	},
 	mode  => 'insert'
 	);
-$rss->save("/Users/tony/Sites/ripper.xml");
+$rss->save("/Users/username/Sites/ripper.xml");
 
 # cleanup after yourself
 unlink "/tmp/eclectic_$now.m4a", "$fifo", "/tmp/output.xml" or die "couldn't delete: $!\n";
